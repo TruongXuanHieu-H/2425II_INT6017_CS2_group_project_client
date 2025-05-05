@@ -7,6 +7,8 @@ const ImageUpload: React.FC = () => {
 	const [preview, setPreview] = useState<string>('');
 	const [uploading, setUploading] = useState(false);
 	const [message, setMessage] = useState<string>('');
+	const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+	const [waitingForPdf, setWaitingForPdf] = useState(false);
 
 	const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
 		if (event.target.files && event.target.files[0]) {
@@ -48,10 +50,12 @@ const ImageUpload: React.FC = () => {
 			if (response.ok) {
 				let data = await response.json();
 				if (data.pdf_url) {
-					setMessage(data.pdf_url);
+					setPdfUrl(data.pdf_url);
+					setMessage('Đã nhận được file PDF!');
 				} else if (data.upload_status == 301) {
-					setMessage(data.gcs_presigned_url);
-					console.log('UUID: ' + data.job_uuid)
+					setMessage('Đang xử lý file, vui lòng chờ...');
+					setWaitingForPdf(true);
+					
 					const gcsResponse = await fetch(data.gcs_presigned_url, {
 						method: 'PUT',
 						headers: {
@@ -59,8 +63,6 @@ const ImageUpload: React.FC = () => {
 						},
 						body: selectedFile,
 					});
-
-					console.log(config.pusherKey)
 
 					const pusher = new Pusher(config.pusherKey, {
 						cluster: config.pusherCluster,
@@ -71,9 +73,14 @@ const ImageUpload: React.FC = () => {
 					const channel = pusher.subscribe(data.job_uuid);
 
 					channel.bind('message', function(eventData: any) {
-						console.log('Received event data:', eventData);
-						// Xử lý dữ liệu nhận được từ backend tại đây
-						setMessage('Đã nhận kết quả từ backend: ' + JSON.stringify(eventData));
+						if (eventData && eventData.file_url) {
+							setPdfUrl(eventData.file_url);
+							setMessage('Đã nhận được file PDF!');
+							setWaitingForPdf(false);
+						} else {
+							setMessage('Đã nhận kết quả từ backend: ' + JSON.stringify(eventData));
+							setWaitingForPdf(false);
+						}
 					});
 				} else {
 					setMessage('Error in message receiving');
@@ -113,7 +120,19 @@ const ImageUpload: React.FC = () => {
 				</div>
 			)}
 
-			{message && (
+			{waitingForPdf && (
+				<div className="message">
+					Đang xử lý file, vui lòng chờ...
+				</div>
+			)}
+
+			{pdfUrl && (
+				<div className="message success">
+					Đã nhận được file PDF: <a href={pdfUrl} target="_blank" rel="noopener noreferrer">{pdfUrl}</a>
+				</div>
+			)}
+
+			{message && !waitingForPdf && !pdfUrl && (
 				<div className={`message ${message.includes('Error') ? 'error' : 'success'}`}>
 					{message}
 				</div>
