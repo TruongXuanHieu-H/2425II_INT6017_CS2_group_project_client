@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { config } from '../config/config';
+import Pusher from 'pusher-js';
 
 const ImageUpload: React.FC = () => {
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -50,12 +51,29 @@ const ImageUpload: React.FC = () => {
 					setMessage(data.pdf_url);
 				} else if (data.upload_status == 301) {
 					setMessage(data.gcs_presigned_url);
+					console.log('UUID: ' + data.job_uuid)
 					const gcsResponse = await fetch(data.gcs_presigned_url, {
 						method: 'PUT',
 						headers: {
 							'Content-Type': 'application/octet-stream',
 						},
 						body: selectedFile,
+					});
+
+					console.log(config.pusherKey)
+
+					const pusher = new Pusher(config.pusherKey, {
+						cluster: config.pusherCluster,
+						forceTLS: true,
+						enabledTransports: ['ws'], 
+					});
+
+					const channel = pusher.subscribe(data.job_uuid);
+
+					channel.bind('message', function(eventData: any) {
+						console.log('Received event data:', eventData);
+						// Xử lý dữ liệu nhận được từ backend tại đây
+						setMessage('Đã nhận kết quả từ backend: ' + JSON.stringify(eventData));
 					});
 				} else {
 					setMessage('Error in message receiving');
