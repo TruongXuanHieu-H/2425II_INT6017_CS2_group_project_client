@@ -41,12 +41,15 @@ const ImageUpload: React.FC = () => {
 				body: formData,
 			});
 
+			console.log(response)
+
 
 			if (response.ok) {
 				let data = await response.json();
-				if (data.upload_status == 300) {
+				if (data.pdf_url) {
 					setMessage(data.pdf_url);
 				} else if (data.upload_status == 301) {
+					setMessage(data.gcs_presigned_url);
 					const gcsResponse = await fetch(data.gcs_presigned_url, {
 						method: 'PUT',
 						headers: {
@@ -54,7 +57,6 @@ const ImageUpload: React.FC = () => {
 						},
 						body: selectedFile,
 					});
-					
 				} else {
 					setMessage('Error in message receiving');
 				}
